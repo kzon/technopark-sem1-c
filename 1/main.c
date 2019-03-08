@@ -15,6 +15,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <ctype.h>
 #include <string.h>
 
@@ -23,8 +24,9 @@
 #define OPEN_TAG "<div>"
 #define CLOSE_TAG "</div>"
 
-#define MAX_LINE_SIZE 10000
-#define MAX_LINES_COUNT 100
+#define START_STRING_SIZE 100
+#define START_STRINGS_COUNT 10
+
 #define MAX_TOKENS_COUNT 100
 #define TOKEN_CONTENT_SIZE 1000
 
@@ -35,83 +37,123 @@ typedef struct {
   char content[TOKEN_CONTENT_SIZE];
 } token;
 
+typedef struct {
+  char **strings;
+  size_t size;
+  size_t capacity;
+} strings;
+
+#define STRINGS_INITIALIZER {NULL, 0, 0}
+
 void print_error();
 
-char **alloc_strings_array(size_t n, size_t string_size);
+bool insert_string(strings *arr, char *string);
 
-void free_strings_array(char **arr, size_t n);
+void free_strings(strings *arr);
 
-void read_lines(char *const *input);
+char *read_string();
 
-void print_lines(char *const *output);
+bool read_strings(strings *input);
+
+void print_strings(const strings *output);
 
 char *trim_spaces(char *s);
 
 size_t get_next_token(const char *s, token *token);
 
-size_t tokenize(char **s, token *tokens);
+size_t tokenize(const strings *arr, token *tokens);
 
-static int div_format_error = 0;
-char **div_format(char **s);
+bool div_format(const strings *input, strings *output);
 
 int main() {
-  char **input = alloc_strings_array(MAX_LINES_COUNT, MAX_LINE_SIZE);
-  if (input == NULL) {
+  strings input = STRINGS_INITIALIZER;
+  if (!read_strings(&input)) {
     print_error();
+    free_strings(&input);
     return 0;
   }
-  read_lines(input);
-  char **output = div_format(input);
-  if (output == NULL) {
+  strings output = STRINGS_INITIALIZER;
+  bool is_format_success = div_format(&input, &output);
+  free_strings(&input);
+  if (!is_format_success) {
     print_error();
+    free_strings(&output);
     return 0;
   }
-  free_strings_array(input, MAX_LINES_COUNT);
-  if (div_format_error)
-    print_error();
-  else
-    print_lines(output);
-  free_strings_array(output, MAX_LINES_COUNT);
+  print_strings(&output);
+  free_strings(&output);
   return 0;
 }
 
-inline void print_error() {
-  printf("[error]");
-}
+inline void print_error() { printf("[error]"); }
 
-/* Returns NULL on failure */
-char **alloc_strings_array(size_t n, size_t string_size) {
-  if (n == 0 || string_size == 0) return NULL;
-  char **arr = malloc(n * sizeof(char *));
-  if (arr == NULL) return NULL;
-  for (size_t i = 0; i < n; ++i) {
-    arr[i] = calloc(string_size, sizeof(char));
-    if (arr[i] == NULL) return NULL;
+/* Returns true on success */
+bool insert_string(strings *arr, char *string) {
+  if (arr == NULL || string == NULL) return false;
+  if (arr->strings == NULL) arr->size = arr->capacity = 0;
+  if (arr->size + 1 >= arr->capacity) {
+    size_t new_capacity = arr->capacity == 0 ? START_STRINGS_COUNT : arr->capacity * 2;
+    char **new_strings = realloc(arr->strings, sizeof(char *) * new_capacity);
+    if (new_strings == NULL) return false;
+    arr->strings = new_strings;
+    arr->capacity = new_capacity;
   }
-  return arr;
+  arr->strings[arr->size++] = string;
+  return true;
 }
 
-void free_strings_array(char **arr, size_t n) {
-  if (arr == NULL) return;
-  for (size_t i = 0; i < n; ++i)
-    free(arr[i]);
-  free(arr);
+void free_strings(strings *arr) {
+  if (arr == NULL || arr->strings == NULL) return;
+  for (size_t i = 0; i < arr->size; ++i)
+    if (arr->strings[i] != NULL)
+      free(arr->strings[i]);
+  free(arr->strings);
+  arr->strings = NULL;
+  arr->size = arr->capacity = 0;
 }
 
-void read_lines(char *const *input) {
-  if (input == NULL) return;
-  char line[MAX_LINE_SIZE];
-  size_t lines_read = 0;
-  while (fgets(line, MAX_LINE_SIZE, stdin) != NULL)
-    strncpy(input[lines_read++], line, MAX_LINE_SIZE);
+char *read_string() {
+  struct {
+    char *string;
+    size_t size;
+    size_t capacity;
+  } buffer = {NULL, 0, 0};
+  char c;
+  while (c = (char) getchar(), c != EOF) {
+    if (buffer.size + 1 >= buffer.capacity) {
+      size_t new_capacity = buffer.capacity == 0 ? START_STRING_SIZE : buffer.capacity * 2;
+      char *new_string = realloc(buffer.string, (new_capacity + 1) * sizeof(char));
+      if (new_string == NULL) {
+        if (buffer.string != NULL)
+          free(buffer.string);
+        return NULL;
+      }
+      buffer.string = new_string;
+      buffer.capacity = new_capacity;
+    }
+    buffer.string[buffer.size] = c;
+    buffer.string[++buffer.size] = '\0';
+    if (c == '\n') break;
+  }
+  return buffer.string;
 }
 
-void print_lines(char *const *output) {
+/* Returns true on success */
+bool read_strings(strings *input) {
+  if (input == NULL) return false;
+  char *string;
+  while ((string = read_string()) != NULL)
+    if (!insert_string(input, string))
+      return false;
+  return true;
+}
+
+void print_strings(const strings *output) {
   if (output == NULL) return;
-  for (size_t i = 0; i < MAX_LINES_COUNT; ++i) {
-    if (output[i] == NULL) return;
-    if (*output[i] != '\0')
-      printf("%s\n", output[i]);
+  for (size_t i = 0; i < output->size; ++i) {
+    if (output->strings[i] == NULL) return;
+    if (*output->strings[i] != '\0')
+      printf("%s", output->strings[i]);
   }
 }
 
@@ -161,12 +203,12 @@ size_t get_next_token(const char *s, token *const token) {
 }
 
 /* Returns number of found tokens */
-size_t tokenize(char **s, token *tokens) {
-  if (s == NULL || *s == NULL || tokens == NULL) return 0;
+size_t tokenize(const strings *arr, token *tokens) {
+  if (arr == NULL || tokens == NULL) return 0;
   size_t token_length, tokens_count = 0, j;
-  for (size_t i = 0; i < MAX_LINES_COUNT; ++i) {
+  for (size_t i = 0; i < arr->size; ++i) {
     j = 0;
-    while ((token_length = get_next_token(s[i] + j, &tokens[tokens_count])) != 0) {
+    while ((token_length = get_next_token(arr->strings[i] + j, &tokens[tokens_count])) != 0) {
       j += token_length;
       tokens_count++;
     }
@@ -174,32 +216,30 @@ size_t tokenize(char **s, token *tokens) {
   return tokens_count;
 }
 
-/* Returns new allocated strings array or NULL on failure */
-char **div_format(char **s) {
-  if (s == NULL || *s == NULL) return NULL;
-  char **output = alloc_strings_array(MAX_LINES_COUNT, MAX_LINE_SIZE);
-  if (output == NULL) return NULL;
+/* Returns true on success */
+bool div_format(const strings *input, strings *output) {
+  if (input == NULL || output == NULL) return false;
   token tokens[MAX_TOKENS_COUNT];
-  size_t tokens_count = tokenize(s, tokens), lines_count = 0, depth = 0;
+  size_t tokens_count = tokenize(input, tokens), depth = 0;
+  char *string;
   for (size_t i = 0; i < tokens_count; ++i) {
     if (tokens[i].type == TOKEN_CLOSE_TAG) {
-      if (depth == 0) {
-        div_format_error = 1;
-        return output;
-      }
+      if (depth == 0) return false;
       depth -= TAB_SIZE;
     }
 
     if (*tokens[i].content != '\0') {
+      string = malloc((depth + strlen(tokens[i].content) + 2) * sizeof(char));
       for (size_t j = 0; j < depth; ++j)
-        output[lines_count][j] = ' ';
-      strncpy(output[lines_count++] + depth, tokens[i].content, MAX_LINE_SIZE - depth);
+        string[j] = ' ';
+      string[depth] = '\0';
+      strcat(string, tokens[i].content);
+      strcat(string, "\n");
+      if (!insert_string(output, string)) return false;
     }
 
     if (tokens[i].type == TOKEN_OPEN_TAG)
       depth += TAB_SIZE;
   }
-  if (depth != 0)
-    div_format_error = 1;
-  return output;
+  return depth == 0;
 }
