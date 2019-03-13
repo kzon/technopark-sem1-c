@@ -105,8 +105,7 @@ bool insert_string(strings *arr, char *string) {
 void free_strings(strings *arr) {
   if (arr == NULL || arr->strings == NULL) return;
   for (size_t i = 0; i < arr->size; ++i)
-    if (arr->strings[i] != NULL)
-      free(arr->strings[i]);
+    free(arr->strings[i]);
   free(arr->strings);
   arr->strings = NULL;
   arr->size = arr->capacity = 0;
@@ -118,8 +117,8 @@ char *read_string() {
     size_t size;
     size_t capacity;
   } buffer = {NULL, 0, 0};
-  char c;
-  while (c = (char) getchar(), c != EOF) {
+  int c;
+  while (c = getchar(), c != EOF) {
     if (buffer.size + 1 >= buffer.capacity) {
       size_t new_capacity = buffer.capacity == 0 ? START_STRING_SIZE : buffer.capacity * 2;
       char *new_string = realloc(buffer.string, (new_capacity + 1) * sizeof(char));
@@ -131,7 +130,7 @@ char *read_string() {
       buffer.string = new_string;
       buffer.capacity = new_capacity;
     }
-    buffer.string[buffer.size] = c;
+    buffer.string[buffer.size] = (char) c;
     buffer.string[++buffer.size] = '\0';
     if (c == '\n') break;
   }
@@ -205,9 +204,9 @@ size_t get_next_token(const char *s, token *const token) {
 /* Returns number of found tokens */
 size_t tokenize(const strings *arr, token *tokens) {
   if (arr == NULL || tokens == NULL) return 0;
-  size_t token_length, tokens_count = 0, j;
+  size_t tokens_count = 0;
   for (size_t i = 0; i < arr->size; ++i) {
-    j = 0;
+    size_t token_length, j = 0;
     while ((token_length = get_next_token(arr->strings[i] + j, &tokens[tokens_count])) != 0) {
       j += token_length;
       tokens_count++;
