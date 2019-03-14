@@ -5,7 +5,6 @@
 #include <ctype.h>
 #include <assert.h>
 
-
 #define STACK_INITIALIZER {NULL, 0, 0};
 #define STACK_START_CAPACITY 10
 #define STACK_CAPACITY_MULTIPLIER 2
@@ -26,7 +25,6 @@ bool stack_grow(stack *stack);
 bool is_stack_empty(const stack *stack);
 void stack_free(stack *stack);
 
-
 #define STRING_INITIALIZER {NULL, 0, 0};
 #define STRING_START_CAPACITY 50
 #define STRING_CAPACITY_MULTIPLIER 2
@@ -45,9 +43,8 @@ bool string_grow_to(string *string, size_t new_capacity);
 bool is_string_empty(string *string);
 void string_free(string *string);
 
-
 bool evaluate_expression(string *expression, string *result);
-void calculate_expression_on_stack(stack *operators_stack, stack *operands_stack);
+bool calculate_expression_on_stack(stack *operators_stack, stack *operands_stack);
 void calculate(const char *first_operand, const char *second_operand, char operator, string *result);
 void add(const char *first_operand, const char *second_operand, string *result);
 void subtract(const char *first_operand, const char *second_operand, string *result);
@@ -83,7 +80,7 @@ bool evaluate_expression(string *expression, string *result) {
   char current;
   size_t i = 0;
   bool success = true;
-  while (current = expression->content[i++], current != '\0' && success) {
+  while (current = expression->content[i++], current != '\0') {
     if (isdigit(current)) {
       string_add(&number, current);
     } else if (current == '+' || current == '-' || current == '*' || current == '/') {
@@ -95,9 +92,10 @@ bool evaluate_expression(string *expression, string *result) {
           || get_operator_precedence(current) > get_operator_precedence(stack_top_char(&operators))) {
         stack_push_char(&operators, current);
       } else {
-        while (!is_stack_empty(&operators) && stack_top_char(&operators) != '('
+        while (success && !is_stack_empty(&operators) && stack_top_char(&operators) != '('
             && get_operator_precedence(stack_top_char(&operators)) >= get_operator_precedence(current))
-          calculate_expression_on_stack(&operators, &operands);
+          success = calculate_expression_on_stack(&operators, &operands);
+        if (!success) break;
         stack_push_char(&operators, current);
       }
     } else if (current == '(') {
@@ -107,20 +105,23 @@ bool evaluate_expression(string *expression, string *result) {
         stack_push(&operands, number.content);
         string_clear(&number);
       }
-      while (!is_stack_empty(&operators) && stack_top_char(&operators) != '(')
-        calculate_expression_on_stack(&operators, &operands);
+      while (success && !is_stack_empty(&operators) && stack_top_char(&operators) != '(')
+        success = calculate_expression_on_stack(&operators, &operands);
+      if (!success) break;
       if (is_stack_empty(&operators))
         success = false;
       else
         stack_pop(&operators);
     }
   }
+
   if (success) {
     if (!is_string_empty(&number))
       stack_push(&operands, number.content);
-    while (!is_stack_empty(&operators))
-      calculate_expression_on_stack(&operators, &operands);
-    string_append(result, stack_top(&operands));
+    while (success && !is_stack_empty(&operators))
+      success = calculate_expression_on_stack(&operators, &operands);
+    if (success)
+      string_append(result, stack_top(&operands));
   }
 
   stack_free(&operators);
@@ -180,10 +181,12 @@ bool is_stack_empty(const stack *stack) {
 }
 
 void stack_free(stack *stack) {
-  assert(stack != NULL && stack->values != NULL);
-  while (stack->size > 0)
-    free(stack->values[--stack->size]);
-  free(stack->values);
+  assert(stack != NULL);
+  if (stack->values != NULL) {
+    while (stack->size > 0)
+      free(stack->values[--stack->size]);
+    free(stack->values);
+  }
   stack->capacity = 0;
 }
 
@@ -256,9 +259,10 @@ size_t get_operator_precedence(char operator) {
   }
 }
 
-void calculate_expression_on_stack(stack *operators_stack, stack *operands_stack) {
+bool calculate_expression_on_stack(stack *operators_stack, stack *operands_stack) {
   string result = STRING_INITIALIZER;
   char operator = stack_top_char(operators_stack);
+  if (operator == '(') return false;
   char *second_operand = stack_top(operands_stack);
   char *first_operand = stack_before_top(operands_stack);
 
@@ -269,6 +273,7 @@ void calculate_expression_on_stack(stack *operators_stack, stack *operands_stack
   stack_pop(operands_stack);
   stack_push(operands_stack, result.content);
   string_free(&result);
+  return true;
 }
 
 void calculate(const char *first_operand, const char *second_operand, char operator, string *result) {
