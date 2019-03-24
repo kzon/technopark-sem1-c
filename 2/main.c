@@ -551,7 +551,7 @@ bool evaluate_expression(const string *expression, string *result) {
   size_t i = 0;
   bool success = true;
 
-  while (success && current != '\0' && current != '\n') {
+  while (success && current != '\0') {
     if (isdigit(current)) {
       string_add(&number_string, current);
     } else if (current == '-' && (previous == '\0' || is_operator(previous) || previous == '(')) {
@@ -588,7 +588,7 @@ bool evaluate_expression(const string *expression, string *result) {
         success = false;
       else
         char_stack_pop(&operators);
-    } else {
+    } else if (!isspace(current)) {
       success = false;
     }
 
