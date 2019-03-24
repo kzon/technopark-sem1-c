@@ -57,6 +57,7 @@ number *number_multiply(number *first, number *second);
 number *number_divide(number *first, number *second);
 bool number_equal(const number *first, const number *second);
 bool number_less(const number *first, const number *second);
+bool number_abs_less(const number *first, const number *second);
 void number_free(number *number);
 
 #define STACK_INITIALIZER {NULL, 0, 0}
@@ -93,7 +94,7 @@ void char_stack_free(char_stack *stack);
 bool evaluate_expression(string *expression, string *result);
 bool calculate_expression_on_stack(char_stack *operators, number_stack *operands);
 number *calculate(number *first, number *second, char operator);
-bool is_operator(char current);
+bool is_operator(char c);
 size_t get_operator_precedence(char operator);
 
 void print_error();
@@ -282,13 +283,11 @@ void number_sprint(const number *number, string *destination) {
 number *number_new(size_t parts_initial_capacity) {
   number *new_number = malloc(sizeof(number));
   new_number->parts_size = 0;
-  if (parts_initial_capacity != 0) {
+  if (parts_initial_capacity != 0)
     new_number->parts = malloc(sizeof(int) * parts_initial_capacity);
-    new_number->parts_capacity = parts_initial_capacity;
-  } else {
+  else
     new_number->parts = NULL;
-    new_number->parts_capacity = 0;
-  }
+  new_number->parts_capacity = parts_initial_capacity;
   new_number->is_negative = false;
   return new_number;
 }
@@ -460,17 +459,19 @@ number *number_multiply(number *first, number *second) {
 number *number_divide(number *first, number *second) {
   assert(first != NULL && second != NULL);
 
-  if (number_less(first, second))
+  if (number_abs_less(first, second))
     return number_zero();
 
   size_t result_size = first->parts_size;
   number *result = number_new(result_size);
   result->parts_size = result_size;
+  result->is_negative = first->is_negative ^ second->is_negative;
+  first->is_negative = second->is_negative = false;
 
   number *current = number_new(result_size);
   // Initialize as zero
   current->parts_size = 1;
-  memset(current->parts, 0, sizeof(int) * result_size);
+  memset(current->parts, 0, sizeof(int) * current->parts_capacity);
 
   for (int i = (int) first->parts_size - 1; i >= 0; --i) {
     // current = current * NUMBER_BASE
@@ -518,6 +519,12 @@ bool number_less(const number *first, const number *second) {
   assert(first != NULL && second != NULL);
   if (first->is_negative != second->is_negative)
     return first->is_negative;
+  bool is_abs_less = number_abs_less(first, second);
+  return (first->is_negative && second->is_negative) == !is_abs_less;
+}
+
+bool number_abs_less(const number *first, const number *second) {
+  assert(first != NULL && second != NULL);
   if (first->parts_size != second->parts_size)
     return first->parts_size < second->parts_size;
   for (int i = (int) first->parts_size - 1; i >= 0; --i)
@@ -574,6 +581,9 @@ bool evaluate_expression(string *expression, string *result) {
         success = false;
       else
         char_stack_pop(&operators);
+    } else {
+      success = false;
+      break;
     }
 
     previous = current;
