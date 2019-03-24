@@ -11,7 +11,9 @@
        __typeof__ (b) _b = (b); \
      _a > _b ? _a : _b; })
 
-#define STRING_INITIALIZER {NULL, 0, 0};
+#define INPUT_BUFFER_SIZE 1024
+
+#define STRING_INITIALIZER {NULL, 0, 0}
 #define STRING_START_CAPACITY 50
 #define STRING_CAPACITY_MULTIPLIER 2
 
@@ -22,14 +24,15 @@ typedef struct {
 } string;
 
 void string_clear(string *string);
-bool string_add(string *string, char value);
-bool string_append(string *string, const char *other);
-bool string_grow(string *string);
-bool string_grow_to(string *string, size_t new_capacity);
-bool is_string_empty(string *string);
+void string_add(string *string, char value);
+void string_append(string *string, const char *other);
+void string_grow(string *string);
+void string_grow_to(string *string, size_t new_capacity);
+bool is_string_empty(const string *string);
 void string_free(string *string);
 
 #define NUMBER_PART_SIZE 9
+#define NUMBER_PART_FORMAT "%09d"
 #define NUMBER_BASE (int)1E9
 #define NUMBER_START_PARTS_CAPACITY 10
 #define NUMBER_PARTS_CAPACITY_MULTIPLIER 2
@@ -41,7 +44,6 @@ typedef struct {
   bool is_negative;
 } number;
 
-void number_sprint(const number *number, string *destination);
 number *number_new(size_t parts_initial_capacity);
 number *number_zero();
 number *number_from_string(const char *string);
@@ -50,15 +52,18 @@ number *number_from_number(const number *source);
 void number_append_part(number *number, int part);
 void number_parts_grow(number *number);
 void number_parts_grow_to(number *number, size_t new_capacity);
-void number_remove_leading_zeroes(number *result);
+void number_remove_leading_zeroes(number *number);
+void number_sprint(const number *number, string *destination);
+void number_free(number *number);
+bool is_numbers_equal(const number *first, const number *second);
+bool is_numbers_less(const number *first, const number *second);
+bool is_numbers_abs_less(const number *first, const number *second);
+
+// Calculations can modify its params for performance purpose
 number *number_add(number *first, number *second);
 number *number_subtract(number *first, number *second);
 number *number_multiply(number *first, number *second);
 number *number_divide(number *first, number *second);
-bool number_equal(const number *first, const number *second);
-bool number_less(const number *first, const number *second);
-bool number_abs_less(const number *first, const number *second);
-void number_free(number *number);
 
 #define STACK_INITIALIZER {NULL, 0, 0}
 #define STACK_START_CAPACITY 10
@@ -72,8 +77,8 @@ typedef struct {
 
 void number_stack_push(number_stack *stack, const number *number);
 void number_stack_push_string(number_stack *stack, const char *number_as_string);
-number *number_stack_top(number_stack *stack);
-number *number_stack_before_top(number_stack *stack);
+number *number_stack_top(const number_stack *stack);
+number *number_stack_before_top(const number_stack *stack);
 void number_stack_pop(number_stack *stack);
 void number_stack_grow(number_stack *stack);
 void number_stack_free(number_stack *stack);
@@ -85,26 +90,26 @@ typedef struct {
 } char_stack;
 
 void char_stack_push(char_stack *stack, char value);
-char char_stack_top(char_stack *stack);
+char char_stack_top(const char_stack *stack);
 void char_stack_pop(char_stack *stack);
 void char_stack_grow(char_stack *stack);
 bool is_char_stack_empty(const char_stack *stack);
 void char_stack_free(char_stack *stack);
 
-bool evaluate_expression(string *expression, string *result);
-bool calculate_expression_on_stack(char_stack *operators, number_stack *operands);
+bool evaluate_expression(const string *expression, string *result);
+bool calculate_expression_on_stack_top(char_stack *operators, number_stack *operands);
 number *calculate(number *first, number *second, char operator);
 bool is_operator(char c);
 size_t get_operator_precedence(char operator);
 
 void print_error();
 
-char *strdup(const char *s);
+char *strdup(const char *string);
 
 int main() {
   string expression = STRING_INITIALIZER;
-  char input_buffer[1024];
-  while (fgets(input_buffer, 1024, stdin) != NULL)
+  char input_buffer[INPUT_BUFFER_SIZE];
+  while (fgets(input_buffer, INPUT_BUFFER_SIZE, stdin) != NULL)
     string_append(&expression, input_buffer);
   string result = STRING_INITIALIZER;
   if (evaluate_expression(&expression, &result))
@@ -114,7 +119,6 @@ int main() {
 
   string_free(&expression);
   string_free(&result);
-
   return 0;
 }
 
@@ -132,12 +136,12 @@ void number_stack_push_string(number_stack *stack, const char *number_as_string)
   stack->values[stack->size++] = number_from_string(number_as_string);
 }
 
-number *number_stack_top(number_stack *stack) {
+number *number_stack_top(const number_stack *stack) {
   assert(stack != NULL && stack->size > 0);
   return stack->values[stack->size - 1];
 }
 
-number *number_stack_before_top(number_stack *stack) {
+number *number_stack_before_top(const number_stack *stack) {
   assert(stack != NULL && stack->size > 1);
   return stack->values[stack->size - 2];
 }
@@ -161,12 +165,11 @@ void number_stack_grow(number_stack *stack) {
 void number_stack_free(number_stack *stack) {
   assert(stack != NULL);
   if (stack->values != NULL) {
-    while (stack->size > 0) {
+    while (stack->size > 0)
       number_stack_pop(stack);
-    }
     free(stack->values);
   }
-  stack->capacity = 0;
+  stack->size = stack->capacity = 0;
 }
 
 void char_stack_push(char_stack *stack, char value) {
@@ -176,7 +179,7 @@ void char_stack_push(char_stack *stack, char value) {
   stack->values[stack->size++] = value;
 }
 
-char char_stack_top(char_stack *stack) {
+char char_stack_top(const char_stack *stack) {
   assert(stack != NULL && stack->size > 0);
   return stack->values[stack->size - 1];
 }
@@ -205,8 +208,7 @@ bool is_char_stack_empty(const char_stack *stack) {
 void char_stack_free(char_stack *stack) {
   assert(stack != NULL);
   free(stack->values);
-  stack->size = 0;
-  stack->capacity = 0;
+  stack->size = stack->capacity = 0;
 }
 
 void string_clear(string *string) {
@@ -215,47 +217,44 @@ void string_clear(string *string) {
   string->content[0] = '\0';
 }
 
-bool string_add(string *string, char value) {
+void string_add(string *string, char value) {
   assert(string != NULL);
-  if (string->size + 1 >= string->capacity && !string_grow(string))
-    return false;
+  if (string->size + 1 >= string->capacity)
+    string_grow(string);
   string->content[string->size++] = value;
   string->content[string->size] = '\0';
-  return true;
 }
 
-bool string_append(string *string, const char *other) {
+void string_append(string *string, const char *other) {
   assert(string != NULL && other != NULL);
   size_t other_length = strlen(other);
   if (string->size + other_length >= string->capacity) {
     size_t new_capacity = string->capacity +
         other_length * (1 + STRING_CAPACITY_MULTIPLIER) / STRING_CAPACITY_MULTIPLIER;
-    if (!string_grow_to(string, new_capacity)) return false;
+    string_grow_to(string, new_capacity);
   }
   strncpy(string->content + string->size, other, other_length);
   string->size += other_length;
   string->content[string->size] = '\0';
-  return true;
 }
 
-bool string_grow(string *string) {
+void string_grow(string *string) {
   assert(string != NULL);
   size_t new_capacity = string->capacity == 0
                         ? STRING_START_CAPACITY
                         : string->capacity * STRING_CAPACITY_MULTIPLIER;
-  return string_grow_to(string, new_capacity);
+  string_grow_to(string, new_capacity);
 }
 
-bool string_grow_to(string *string, size_t new_capacity) {
+void string_grow_to(string *string, size_t new_capacity) {
   assert(string != NULL);
   char *new_content = realloc(string->content, sizeof(char) * new_capacity);
-  if (new_content == NULL) return false;
+  assert(new_content != NULL);
   string->content = new_content;
   string->capacity = new_capacity;
-  return true;
 }
 
-bool is_string_empty(string *string) {
+bool is_string_empty(const string *string) {
   assert(string != NULL);
   return string->size == 0;
 }
@@ -266,27 +265,16 @@ void string_free(string *string) {
   string->size = string->capacity = 0;
 }
 
-void number_sprint(const number *number, string *destination) {
-  assert(number != NULL);
-  string_grow_to(destination, number->parts_size * NUMBER_PART_SIZE + 2);
-  if (number->is_negative)
-    string_add(destination, '-');
-  char buffer[NUMBER_PART_SIZE + 1];
-  sprintf(buffer, "%d", number->parts_size == 0 ? 0 : number->parts[number->parts_size - 1]);
-  string_append(destination, buffer);
-  for (int i = (int) number->parts_size - 2; i >= 0; --i) {
-    sprintf(buffer, "%09d", number->parts[i]);
-    string_append(destination, buffer);
-  }
-}
-
 number *number_new(size_t parts_initial_capacity) {
   number *new_number = malloc(sizeof(number));
+  assert(new_number != NULL);
   new_number->parts_size = 0;
-  if (parts_initial_capacity != 0)
+  if (parts_initial_capacity != 0) {
     new_number->parts = malloc(sizeof(int) * parts_initial_capacity);
-  else
+    assert(new_number->parts != NULL);
+  } else {
     new_number->parts = NULL;
+  }
   new_number->parts_capacity = parts_initial_capacity;
   new_number->is_negative = false;
   return new_number;
@@ -359,9 +347,57 @@ void number_parts_grow_to(number *number, size_t new_capacity) {
   number->parts_capacity = new_capacity;
 }
 
-void number_remove_leading_zeroes(number *result) {
-  while (result->parts_size > 1 && result->parts[result->parts_size - 1] == 0)
-    result->parts_size--;
+void number_remove_leading_zeroes(number *number) {
+  while (number->parts_size > 1 && number->parts[number->parts_size - 1] == 0)
+    number->parts_size--;
+}
+
+void number_sprint(const number *number, string *destination) {
+  assert(number != NULL);
+  string_grow_to(destination, number->parts_size * NUMBER_PART_SIZE + 2);
+  if (number->is_negative)
+    string_add(destination, '-');
+  char buffer[NUMBER_PART_SIZE + 1];
+  sprintf(buffer, "%d", number->parts_size == 0 ? 0 : number->parts[number->parts_size - 1]);
+  string_append(destination, buffer);
+  for (int i = (int) number->parts_size - 2; i >= 0; --i) {
+    sprintf(buffer, NUMBER_PART_FORMAT, number->parts[i]);
+    string_append(destination, buffer);
+  }
+}
+
+void number_free(number *number) {
+  assert(number != NULL);
+  free(number->parts);
+  free(number);
+}
+
+bool is_numbers_equal(const number *first, const number *second) {
+  assert(first != NULL && second != NULL);
+  if (first->parts_size != second->parts_size) return false;
+  if (first->is_negative != second->is_negative) return false;
+  for (size_t i = 0; i < first->parts_size; ++i)
+    if (first->parts[i] != second->parts[i])
+      return false;
+  return true;
+}
+
+bool is_numbers_less(const number *first, const number *second) {
+  assert(first != NULL && second != NULL);
+  if (first->is_negative != second->is_negative)
+    return first->is_negative;
+  bool is_abs_less = is_numbers_abs_less(first, second);
+  return (first->is_negative && second->is_negative) == !is_abs_less;
+}
+
+bool is_numbers_abs_less(const number *first, const number *second) {
+  assert(first != NULL && second != NULL);
+  if (first->parts_size != second->parts_size)
+    return first->parts_size < second->parts_size;
+  for (int i = (int) first->parts_size - 1; i >= 0; --i)
+    if (first->parts[i] != second->parts[i])
+      return first->parts[i] < second->parts[i];
+  return false;
 }
 
 number *number_add(number *first, number *second) {
@@ -417,11 +453,11 @@ number *number_subtract(number *first, number *second) {
   }
 
   // a = b => a, b > 0
-  if (number_equal(first, second))
+  if (is_numbers_equal(first, second))
     return number_zero();
 
   // a, b > 0, a < b => a-b = -(b-a)
-  if (number_less(first, second)) {
+  if (is_numbers_less(first, second)) {
     number *result = number_subtract(second, first);
     result->is_negative = true;
     return result;
@@ -459,7 +495,7 @@ number *number_multiply(number *first, number *second) {
 number *number_divide(number *first, number *second) {
   assert(first != NULL && second != NULL);
 
-  if (number_abs_less(first, second))
+  if (is_numbers_abs_less(first, second))
     return number_zero();
 
   size_t result_size = first->parts_size;
@@ -486,7 +522,7 @@ number *number_divide(number *first, number *second) {
     while (left <= right) {
       int medium = (left + right) / 2;
       number *second_multiply_medium = number_multiply(second, number_from_int(medium));
-      if (number_less(second_multiply_medium, current) || number_equal(second_multiply_medium, current)) {
+      if (is_numbers_less(second_multiply_medium, current) || is_numbers_equal(second_multiply_medium, current)) {
         x = medium;
         left = medium + 1;
       } else {
@@ -505,95 +541,66 @@ number *number_divide(number *first, number *second) {
   return result;
 }
 
-bool number_equal(const number *first, const number *second) {
-  assert(first != NULL && second != NULL);
-  if (first->parts_size != second->parts_size) return false;
-  if (first->is_negative != second->is_negative) return false;
-  for (size_t i = 0; i < first->parts_size; ++i)
-    if (first->parts[i] != second->parts[i])
-      return false;
-  return true;
-}
+bool evaluate_expression(const string *expression, string *result) {
+  assert(expression != NULL && result != NULL && !is_string_empty(expression));
 
-bool number_less(const number *first, const number *second) {
-  assert(first != NULL && second != NULL);
-  if (first->is_negative != second->is_negative)
-    return first->is_negative;
-  bool is_abs_less = number_abs_less(first, second);
-  return (first->is_negative && second->is_negative) == !is_abs_less;
-}
-
-bool number_abs_less(const number *first, const number *second) {
-  assert(first != NULL && second != NULL);
-  if (first->parts_size != second->parts_size)
-    return first->parts_size < second->parts_size;
-  for (int i = (int) first->parts_size - 1; i >= 0; --i)
-    if (first->parts[i] != second->parts[i])
-      return first->parts[i] < second->parts[i];
-  return false;
-}
-
-void number_free(number *number) {
-  assert(number != NULL);
-  free(number->parts);
-  free(number);
-}
-
-bool evaluate_expression(string *expression, string *result) {
-  assert(expression != NULL && result != NULL);
   char_stack operators = STACK_INITIALIZER;
   number_stack operands = STACK_INITIALIZER;
   string number_string = STRING_INITIALIZER;
-  char current, previous = '\0';
+  char current = expression->content[0], previous = '\0';
   size_t i = 0;
   bool success = true;
-  while (current = expression->content[i++], current != '\0') {
+
+  while (success && current != '\0' && current != '\n') {
     if (isdigit(current)) {
       string_add(&number_string, current);
     } else if (current == '-' && (previous == '\0' || is_operator(previous) || previous == '(')) {
-      string_add(&number_string, '-');
+      string_add(&number_string, '-');  // Add unary minus
     } else if (is_operator(current)) {
+      // Push read number to stack
       if (!is_string_empty(&number_string)) {
         number_stack_push_string(&operands, number_string.content);
         string_clear(&number_string);
       }
+
       if (is_char_stack_empty(&operators) || char_stack_top(&operators) == '('
           || get_operator_precedence(current) > get_operator_precedence(char_stack_top(&operators))) {
         char_stack_push(&operators, current);
       } else {
         while (success && !is_char_stack_empty(&operators) && char_stack_top(&operators) != '('
             && get_operator_precedence(char_stack_top(&operators)) >= get_operator_precedence(current))
-          success = calculate_expression_on_stack(&operators, &operands);
+          success = calculate_expression_on_stack_top(&operators, &operands);
         if (!success) break;
         char_stack_push(&operators, current);
       }
     } else if (current == '(') {
       char_stack_push(&operators, current);
     } else if (current == ')') {
+      // Push read number to stack
       if (!is_string_empty(&number_string)) {
         number_stack_push_string(&operands, number_string.content);
         string_clear(&number_string);
       }
       while (success && !is_char_stack_empty(&operators) && char_stack_top(&operators) != '(')
-        success = calculate_expression_on_stack(&operators, &operands);
-      if (!success) break;
+        success = calculate_expression_on_stack_top(&operators, &operands);
+      if (!success) continue;
       if (is_char_stack_empty(&operators))
         success = false;
       else
         char_stack_pop(&operators);
     } else {
       success = false;
-      break;
     }
 
     previous = current;
+    current = expression->content[++i];
   }
 
   if (success) {
     if (!is_string_empty(&number_string))
       number_stack_push_string(&operands, number_string.content);
     while (success && !is_char_stack_empty(&operators))
-      success = calculate_expression_on_stack(&operators, &operands);
+      success = calculate_expression_on_stack_top(&operators, &operands);
     if (success) {
       number *result_number = number_stack_top(&operands);
       number_sprint(result_number, result);
@@ -608,9 +615,7 @@ bool evaluate_expression(string *expression, string *result) {
 
 inline void print_error() { printf("[error]"); }
 
-inline bool is_operator(char c) {
-  return c == '+' || c == '-' || c == '*' || c == '/';
-}
+inline bool is_operator(char c) { return c == '+' || c == '-' || c == '*' || c == '/'; }
 
 size_t get_operator_precedence(char operator) {
   switch (operator) {
@@ -622,7 +627,7 @@ size_t get_operator_precedence(char operator) {
   }
 }
 
-bool calculate_expression_on_stack(char_stack *operators, number_stack *operands) {
+bool calculate_expression_on_stack_top(char_stack *operators, number_stack *operands) {
   char operator = char_stack_top(operators);
   if (operator == '(') return false;
   number *first = number_stack_before_top(operands);
@@ -651,10 +656,9 @@ number *calculate(number *first, number *second, char operator) {
   return NULL;
 }
 
-char *strdup(const char *s) {
-  size_t len = strlen(s) + 1;
-  void *new = malloc(len);
-  if (new == NULL)
-    return NULL;
-  return (char *) memcpy(new, s, len);
+char *strdup(const char *string) {
+  size_t length = strlen(string) + 1;
+  char *new_string = malloc(sizeof(char) * length);
+  assert(new_string != NULL);
+  return memcpy(new_string, string, length);
 }
