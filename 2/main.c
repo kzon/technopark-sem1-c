@@ -293,13 +293,8 @@ number *number_new(size_t parts_initial_capacity) {
   return new_number;
 }
 
-number *number_zero() {
-  number *new_number = malloc(sizeof(number));
-  new_number->parts = malloc(sizeof(int));
-  new_number->parts[0] = 0;
-  new_number->parts_size = new_number->parts_capacity = 1;
-  new_number->is_negative = false;
-  return new_number;
+inline number *number_zero() {
+  return number_from_int(0);
 }
 
 number *number_from_string(const char *string) {
@@ -466,7 +461,7 @@ number *number_divide(number *first, number *second) {
   assert(first != NULL && second != NULL);
 
   if (number_less(first, second))
-    return number_from_int(0);
+    return number_zero();
 
   size_t result_size = first->parts_size;
   number *result = number_new(result_size);
