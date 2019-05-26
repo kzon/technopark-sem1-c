@@ -1,2 +1,2 @@
-# Pure C Tasks by Technopark@Mail.ru
+# Pure C Tasks by Technopark
 
