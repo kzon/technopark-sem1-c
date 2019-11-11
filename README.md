@@ -1,4 +1,4 @@
-# Pure C Tasks by Technopark
+# Pure C tasks by Technopark
 
 Task 1: HTML div tags formatter
 
