@@ -1,5 +1,5 @@
-# Pure C tasks by Technopark
+# Задания по C Технопарка Mail.ru
 
-Task 1: HTML div tags formatter
+- Задание 1: форматирование отступов HTML
 
-Task 2: Long arithmetic calculator with parser
+- Задание 2: калькулятор с длинной арифметикой и парсером
